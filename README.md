@@ -31,6 +31,54 @@ Docker'а на ноутбуке нет? Тогда локально работа
 | `make seed` | перезалить учебные данные |
 | `make help` | список всех команд |
 
+## Как проверить, что сервис жив
+
+После `make up` есть несколько независимых способов убедиться, что backend и база работают.
+
+1. **HTTP health-эндпоинт.** Самый прямой способ — обратиться к `/health`:
+
+   ```bash
+   curl -i http://localhost:${APP_PORT:-8080}/health
+   ```
+
+   Ожидаем `HTTP/1.1 200 OK`. Порт берётся из переменной `APP_PORT` (по умолчанию `8080`),
+   как и в `docker-compose.yml`.
+
+2. **Статус контейнеров.** `docker compose` показывает, поднялись ли сервисы и прошёл ли healthcheck у БД:
+
+   ```bash
+   make ps
+   # или эквивалент
+   docker compose ps
+   ```
+
+   У `db` в колонке `STATUS` должно быть `(healthy)`, у `backend` — `Up`. Если `db` висит в
+   `starting` или `unhealthy` — backend ещё не стартовал (`depends_on: service_healthy`).
+
+3. **Логи backend.** Если контейнеры в `Up`, но `/health` не отвечает — смотрим, что пишет PHP-сервер:
+
+   ```bash
+   make logs
+   # или
+   docker compose logs --tail=100 backend
+   ```
+
+4. **Тесты.** PHPUnit поднимает свой контейнер и ходит в приложение. Зелёный прогон — тоже сигнал,
+   что код и окружение рабочие (база при этом не требуется: см. `make test`):
+
+   ```bash
+   make test
+   ```
+
+5. **Проверка изнутри контейнера.** Полезно, если порт снаружи не пробросился, а контейнер `Up`:
+
+   ```bash
+   docker compose exec backend curl -sS http://127.0.0.1:8080/health
+   ```
+
+Если `curl` падает с `Connection refused` — сначала дождитесь `db (healthy)` в `make ps`,
+а потом — `backend (Up)`. Обычно 5–15 секунд после `make up`.
+
 ## API
 
 | Метод | Путь | Зачем |
